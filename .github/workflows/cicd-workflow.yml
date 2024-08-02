@@ -6,25 +6,38 @@ on:
 
 jobs:
   build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v3
+
+      - name: Login to docker hub
+        run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Build docker image
+        run: docker buildx build --push --tag milanbavishi/nodejs1:latest .
+
+  deploy:
+    needs: build
     runs-on: [ubuntu-latest]
     steps:
       - name: Checkout source
         uses: actions/checkout@v3
-      - name: Login to docker hub
-        run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }} 
-      - name: Build docker image
-        run: docker build -t milanbavishi/nodejs1.
-      - name: Publish image to docker hub
-        run: docker push milanbavishi/nodejs1:latest
         
-  deploy:
-    needs: build
-    runs-on: [aws-ec2]
-    steps:
+      - name: Login to docker hub
+        run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+
       - name: Pull image from docker hub
         run: docker pull milanbavishi/nodejs1:latest
-      - name: Delete old container
-        run: docker rm -f nodejs1-container
-      - name: Run docker container
-        run: docker run -d -p 5000:5000 --name nodejs1-container milanbavishi/nodejs1.
 
+      - name: Delete old container
+        run: |
+          if [ $(docker ps -a -q --filter name=nodejs1-container) ]; then
+            docker rm -f nodejs1-container
+          fi
+
+      - name: Run docker container
+        run: docker run -d -p 5000:5000 --name nodejs1-container milanbavishi/nodejs1:latest
